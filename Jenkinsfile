@@ -1,28 +1,58 @@
 pipeline {
-    
-    agent any
-    
-    stages {
-        
-        stage("build") {
-            
-            steps {
-                echo 'building the application...'
-            }
-        }
-        
-        stage("test") {
-            
-            steps {
-                echo 'testing the application...'
-            }
-        }
-        
-        stage("deploy") {
-            
-            steps {
-                echo 'deploying the applicaion...'
-            }
-        }
+  agent {
+    kubernetes {
+      defaultContainer 'jnlp'
+      yaml """
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          labels:
+            jenkins: slave
+        spec:
+          containers:
+          - name: wp
+            image: wordpress
+            command:
+            - cat
+            tty: true
+          - name: azure-cli
+            image: microsoft/azure-cli:2.0
+            command:
+            - sleep
+            - infinity
+            tty: true
+      """
     }
+  }
+  
+  stages {
+    stage('Build image') {
+      steps {
+        sh 'docker build -t my-wordpress-image:$BUILD_NUMBER .'
+      }
+    }
+    
+    stage('Push image to Docker registry') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerb', passwordVariable: 'p2ace0fm1nd!', usernameVariable: 'lkasd7512')]) {
+          sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
+        }
+        
+        sh 'docker push my-wordpress-image:$BUILD_NUMBER'
+      }
+    }
+    
+    stage('Update deployment') {
+      steps {
+        script {
+          def label = "app=wordpress"
+          def wp_pod = sh(script: "kubectl get pods -l $label -o jsonpath='{.items[0].metadata.name}'", returnStdout: true).trim()
+          
+          sh "kubectl cp index.php ${wp_pod}:/var/www/html/index.php"
+          
+          sh "kubectl set image deployment/wordpress wordpress=my-wordpress-image:$BUILD_NUMBER"
+        }
+      }
+    }
+  }
 }
