@@ -1,30 +1,6 @@
 pipeline {
   agent {
-    kubernetes {
-      defaultContainer 'jnlp'
-      yaml """
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          labels:
-            jenkins: slave
-        spec:
-          containers:
-          - name: wp
-            image: wordpress
-            command:
-            - cat
-            tty: true
-          - name: azure-cli
-            image: microsoft/azure-cli:2.0
-            command:
-            - sleep
-            - infinity
-            tty: true
-      """
-    }
-  }
-  
+    
   stages {
     stage('Build image') {
       steps {
